@@ -8,6 +8,10 @@ int runops_switch(pTHX)
     while (PL_op) {
 	switch (PL_op->op_type) {
 	    case OP_NULL:
+	    case OP_SCALAR:
+	    case OP_SCOPE:
+	    case OP_LINESEQ:
+	    case OP_REGCMAYBE:
 		PL_op = NORMAL; break;
 	    case OP_STUB:
 		{
@@ -18,8 +22,6 @@ int runops_switch(pTHX)
 		    PL_op = NORMAL;
 		}
 		break;
-	    case OP_SCALAR:
-		PL_op = NORMAL; break;
 	    case OP_PUSHMARK:
 		PUSHMARK(PL_stack_sp);
 		PL_op = NORMAL;
@@ -50,13 +52,7 @@ int runops_switch(pTHX)
 	    case OP_PADANY:
 		PL_op = Perl_pp_padany(aTHX); break;
 	    case OP_PUSHRE:
-		{
-		    dSP;
-		    XPUSHs((SV*)PL_op);
-		    PUTBACK;
-		    PL_op = NORMAL;
-		}
-		break;
+		PL_op = Perl_pp_pushre(aTHX); break;
 	    case OP_RV2GV:
 		PL_op = Perl_pp_rv2gv(aTHX); break;
 	    case OP_RV2SV:
@@ -85,8 +81,6 @@ int runops_switch(pTHX)
 		PL_op = Perl_pp_readline(aTHX); break;
 	    case OP_RCATLINE:
 		PL_op = Perl_pp_rcatline(aTHX); break;
-	    case OP_REGCMAYBE:
-		PL_op = Perl_pp_regcmaybe(aTHX); break;
 	    case OP_REGCRESET:
 		PL_op = Perl_pp_regcreset(aTHX); break;
 	    case OP_REGCOMP:
@@ -412,8 +406,6 @@ int runops_switch(pTHX)
 		PL_op = Perl_pp_die(aTHX); break;
 	    case OP_RESET:
 		PL_op = Perl_pp_reset(aTHX); break;
-	    case OP_LINESEQ:
-		PL_op = Perl_pp_lineseq(aTHX); break;
 	    case OP_NEXTSTATE:
 		PL_curcop = (COP*)PL_op;
 		TAINT_NOT;		/* Each statement is presumed innocent */
@@ -438,8 +430,6 @@ int runops_switch(pTHX)
 		PL_op = Perl_pp_enter(aTHX); break;
 	    case OP_LEAVE:
 		PL_op = Perl_pp_leave(aTHX); break;
-	    case OP_SCOPE:
-		PL_op = Perl_pp_scope(aTHX); break;
 	    case OP_ENTERITER:
 		PL_op = Perl_pp_enteriter(aTHX); break;
 	    case OP_ITER:
@@ -499,6 +489,9 @@ int runops_switch(pTHX)
 	    case OP_PRTF:
 		PL_op = Perl_pp_prtf(aTHX); break;
 	    case OP_PRINT:
+#if PERL_VERSION >= 10
+	    case OP_SAY:
+#endif
 		PL_op = Perl_pp_print(aTHX); break;
 	    case OP_SYSOPEN:
 		PL_op = Perl_pp_sysopen(aTHX); break;
@@ -699,9 +692,8 @@ int runops_switch(pTHX)
 	    case OP_SEMOP:
 		PL_op = Perl_pp_semop(aTHX); break;
 	    case OP_REQUIRE:
-		PL_op = Perl_pp_require(aTHX); break;
 	    case OP_DOFILE:
-		PL_op = Perl_pp_dofile(aTHX); break;
+		PL_op = Perl_pp_require(aTHX); break;
 	    case OP_ENTEREVAL:
 		PL_op = Perl_pp_entereval(aTHX); break;
 	    case OP_LEAVEEVAL:
@@ -776,8 +768,10 @@ int runops_switch(pTHX)
 		PL_op = Perl_pp_syscall(aTHX); break;
 	    case OP_LOCK:
 		PL_op = Perl_pp_lock(aTHX); break;
+#if PERL_VERSION < 10
 	    case OP_THREADSV:
 		PL_op = Perl_pp_threadsv(aTHX); break;
+#endif
 	    case OP_SETSTATE:
 		PL_curcop = (COP*)PL_op;
 		PL_op = NORMAL;
@@ -790,10 +784,28 @@ int runops_switch(pTHX)
 	    case OP_DORASSIGN:
 		PL_op = Perl_pp_dorassign(aTHX); break;
 #endif
+#if PERL_VERSION >= 10
+	    case OP_ENTERGIVEN:
+		PL_op = Perl_pp_entergiven(aTHX); break;
+	    case OP_LEAVEGIVEN:
+		PL_op = Perl_pp_leavegiven(aTHX); break;
+	    case OP_ENTERWHEN:
+		PL_op = Perl_pp_enterwhen(aTHX); break;
+	    case OP_LEAVEWHEN:
+		PL_op = Perl_pp_leavewhen(aTHX); break;
+	    case OP_BREAK:
+		PL_op = Perl_pp_break(aTHX); break;
+	    case OP_CONTINUE:
+		PL_op = Perl_pp_continue(aTHX); break;
+	    case OP_SMARTMATCH:
+		PL_op = Perl_pp_smartmatch(aTHX); break;
+	    case OP_ONCE:
+		PL_op = Perl_pp_once(aTHX); break;
+#endif
 	    case OP_CUSTOM:
 		PL_op = CALL_FPTR(PL_op->op_ppaddr)(aTHX); break;
 	    default:
-		Perl_croak(aTHX_ "Invalid opcode %d\n", PL_op->op_type);
+		Perl_croak(aTHX_ "Invalid opcode '%s'\n", OP_NAME(PL_op));
 	}
 	PERL_ASYNC_CHECK();
     }
